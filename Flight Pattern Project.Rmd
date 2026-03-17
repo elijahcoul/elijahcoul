@@ -1,0 +1,476 @@
+---
+title: "QTM 150: Final Project"
+output: html_document
+author: "Group 11: Nicholas Huang, Theo Burns, Ally Gibbs, Elijah Coulanges, Zachary Etzioni, and Yifeng Jin"
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1. Research Question
+Provide a research question related to U.S. domestic air travel. Break down the broad question into three smaller research questions.
+
+OVERALL QUESTION: What was the impact of the 737 MAX Groundings in 2019 and 2020 on US Domestic Travel? 
+1. Did the groundings cause a change in overall flight activity for United Airlines, Southwest, and Delta before and after the FAA grounded all 737 MAX planes?
+2. Did the grounding lead to changes in route availability and connectivity to certain U.S. destinations between the three airlines?
+3. Did the groundings influence flight delays and cancellations for affected airlines compared to non affected airlines?
+
+## 2. Rationale for the Research Question
+Why was this particular research question chosen? What led to the decision to explore this topic? 
+
+We wanted to explore the effect plane crashes would have on flight data. While we considered some separate incidents, we could not identify any that occurred recently within the U.S. that would significantly affect domestic air travel. We then turned to the FAA grounding of 737 MAX planes in response to several international plane crashes. This event, we realized, had the potential to produce the largest observable data differences.
+
+## 3. Data Selection
+Detail the dataset(s) your group utilized to address the research question. -What were the reasons for selecting this particular dataset? 
+-Which specific variables will the group be focusing on? 
+
+This dataset contains data from three airports—ORD (Chicago O'Hare), DAL (Dallas Love Field), and ATL (Atlanta Hartsfield-Jackson)—within the time frame of two weeks before and after the grounding and lifting of the 737 MAX. We selected this dataset to analyze three airlines: United, Delta, and Southwest. These airlines represent different fleet compositions: Southwest had a large reliance on the 737 MAX, United had a mixed reliance, and Delta had no reliance. For each of the carriers, we chose the airport in which they had the largest hub (Chicago for United, Atlanta for Delta, and Dallas for Southwest). This selection allowed us to observe differences between the airlines. The airports chosen represent the largest hubs for each airline and would contain the most flight data. We wanted to observe the two weeks before and after the lifting and grounding order. The function get_flights() did not enable specific days to be chosen, so we selected the two months that contained the dates we wanted to observe. We finally used the function get_airlines() to get the dataset that would allow us to look at the location of the airports; this dataset was only used in the second question.
+
+Below, please provide the code your group employed to construct and refine the dataset to suit your research needs. Make sure you export the finalized dataset into a .csv format for uploading to Canvas.
+
+```{r}
+library(dplyr)
+library(anyflights)
+library(tidyverse)
+library(ggplot2)
+library(plotly)
+library(maps)
+library(ggmap)
+
+```
+
+
+## 4. Analytical Approach and Visual Findings
+Apply skills you learned from the classes to import, tidy, transform, wrangle, and visualize the data.
+
+Your group should present *a minimum of three distinct analyses or visualizations* to adequately address the research question. Detail the codes used, and provide a clear interpretation of each visualization.
+
+```{r}
+# QUESTION 1
+overall_data<-read_csv("overall_data.csv")
+
+overall_data <- overall_data %>% #CONVERTING THE DATA TO INCLUDE A DATE COLUMN AND FILTERING FOR AIRLINES OF INTEREST
+  mutate(flight_date = make_date(year, month, day))%>%
+  filter(carrier %in% c("UA", "WN", "DL"))
+
+grounded_dates <- overall_data %>% #CREATING AN OBJECT TO REPRESENT TWO WEEKS BEFORE AND AFTER THE GROUNDING ORDR
+  filter(flight_date >= ymd("2019-02-27") & flight_date <= ymd("2019-03-27"))
+
+lifted_dates <- overall_data %>% #CREATING AN OBJECT TO REPRESENT TWO WEEKS BEFORE AND AFTER THE LIFTING ORDER
+  filter(flight_date >= ymd("2020-11-04") & flight_date <= ymd("2020-12-2"))
+
+#OVERALL FLIGHT DATA
+#GROUNDING
+number_overall_flights_grounded <- grounded_dates %>% #COUNTING FLIGHTS BY DAY
+  group_by(flight_date) %>%
+  summarise(flight_count = n())
+ggplot(number_overall_flights_grounded, aes(x = flight_date, y = flight_count)) +
+  geom_line() +
+  labs(title = "Overall Flights Pre and Post FAA Grounding", x = "Date", y = "Number of Flights")+
+  theme_minimal() + 
+  geom_text(aes(x = as.Date("2019-03-13"), y = 1250, label = "FAA Grounding"), color = "red", size = 3)+
+  scale_y_continuous(limits = c(1000, 1500))
+#Existing periodic trend of increasing and decreasing flight activity. During our period of interest (2/27 - 3/27), there is no significant change in the trend from the graph. This is likely the result of 737 MAX flights being a small portion of overall traffic.
+
+
+#LIFTING
+number_overall_flights_lifted <- lifted_dates %>% #COUNTING FLIGHTS BY DAY
+  group_by(flight_date) %>%
+  summarise(flight_count = n())
+ggplot(number_overall_flights_lifted, aes(x = flight_date, y = flight_count)) +
+  geom_line() +
+  labs(title = "Overall Flights Pre and Post FAA Lifting", x = "Date", y = "Number of Flights")+
+  theme_minimal() + 
+  geom_text(aes(x = as.Date("2020-11-18"), y = 600, label = "FAA Lifting"), color = "red", size = 3)+
+  scale_y_continuous(limits = c(300, 900))
+#After FAA lifted the grounding on Boeing 737 MAX, the number of flights are less turbulent. However, it is questionable to attribute this effect to the lifting.The number of flights increased moderately after FAA lifted the grounding, but the Thanksgiving holiday may explain this rise.
+
+
+#SOUTHWEST FLIGHT DATA
+#GROUNDING
+number_wn_flights_grounded <- grounded_dates %>% #COUNTING FLIGHTS BY DAY AND FILTERING BY ONLY SOUTHWEST
+  filter(carrier == "WN") %>%
+  group_by(flight_date) %>%
+  summarise(flight_count = n())
+ggplot(number_wn_flights_grounded, aes(x = flight_date, y = flight_count)) +
+  geom_line() +
+  labs(title = "Southwest Flights out of Dallas Pre and Post FAA Grounding", x = "Date", y = "Number of Flights")+
+  theme_minimal() + 
+  geom_text(aes(x = as.Date("2019-03-13"), y = 300, label = "FAA Grounding"), color = "red", size = 3)+
+  scale_y_continuous(limits = c(200, 500))
+#No significant change to the existing periodic pattern before and after FAA grounding despite having 737 MAX in their fleet.
+
+#LIFTING
+number_wn_flights_lifted <- lifted_dates %>% 
+  filter(carrier == "WN") %>%
+  group_by(flight_date) %>%
+  summarise(flight_count = n())
+ggplot(number_wn_flights_lifted, aes(x = flight_date, y = flight_count)) +
+  geom_line() +
+  labs(title = "Southwest Flights out of Dallas Pre and Post FAA Lifting", x = "Date", y = "Number of Flights")+
+  theme_minimal() + 
+  geom_text(aes(x = as.Date("2020-11-18"), y = 150, label = "FAA Lifting"), color = "red", size = 3)+
+  scale_y_continuous(limits = c(100, 300))
+#The maximum number of flights increased slightly after FAA lifted the grounding restriction. This again is likely due to the Thanksgiving holiday.
+
+
+#UNITED FLIGHT DATA
+#GROUNDING
+number_ua_flights_grounded <- grounded_dates %>%
+  filter(carrier == "UA") %>%
+  group_by(flight_date) %>%
+  summarise(flight_count = n())
+ggplot(number_ua_flights_grounded, aes(x = flight_date, y = flight_count)) +
+  geom_line() +
+  labs(title = "United Flights out of O'Hare Pre and Post FAA Grounding", x = "Date", y = "Number of Flights")+
+  theme_minimal() + 
+  geom_text(aes(x = as.Date("2019-03-13"), y = 175, label = "FAA Grounding"), color = "red", size = 3)+
+  scale_y_continuous(limits = c(150, 250))
+#After FAA grounding, the number of flights increased significantly. The periodic change in flight number is not affected. 737 MAX planes made up a small portion of United's overall fleet composition, but this rise may be attributed to flying more flights to address gaps in service caused by the grounding.
+
+#LIFTING
+number_ua_flights_lifted <- lifted_dates %>%
+  filter(carrier == "UA") %>%
+  group_by(flight_date) %>%
+  summarise(flight_count = n())
+ggplot(number_ua_flights_lifted, aes(x = flight_date, y = flight_count)) +
+  geom_line() +
+  labs(title = "United Flights out of O'Hare Pre and Post FAA Lifting", x = "Date", y = "Number of Flights")+
+  theme_minimal() + 
+  geom_text(aes(x = as.Date("2020-11-18"), y = 75, label = "FAA Lifting"), color = "red", size = 3)+
+  scale_y_continuous(limits = c(50, 150))
+###After FAA lifted the grounding, the original periodic pattern is disrupted. The flight number is more turbulent. The maximum number of flights increase and the minimum number of flights decreased significantly. Likely due to holiday travel.
+
+#DELTA FLIGHT DATA
+#GROUNDING
+number_dl_flights_grounded <- grounded_dates %>%
+  filter(carrier == "DL") %>%
+  group_by(flight_date) %>%
+  summarise(flight_count = n())
+ggplot(number_dl_flights_grounded, aes(x = flight_date, y = flight_count)) +
+  geom_line() +
+  labs(title = "Delta Flights out of Atlanta Pre and Post FAA Grounding", x = "Date", y = "Number of Flights")+
+  theme_minimal() + 
+  geom_text(aes(x = as.Date("2019-03-13"), y = 700, label = "FAA Grounding"), color = "red", size = 3)+
+  scale_y_continuous(limits = c(400, 900))
+#There is no significant change to the existing pattern after FAA grounded Boeing 737 MAX. Expected due to Delta not operating any 737 MAX planes.
+
+#LIFTING
+number_dl_flights_lifted <- lifted_dates %>%
+  filter(carrier == "DL") %>%
+  group_by(flight_date) %>%
+  summarise(flight_count = n())
+ggplot(number_dl_flights_lifted, aes(x = flight_date, y = flight_count)) +
+  geom_line() +
+  labs(title = "Delta Flights out of Atlanta Pre and Post FAA Lifting", x = "Date", y = "Number of Flights")+
+  theme_minimal() + 
+  geom_text(aes(x = as.Date("2020-11-18"), y = 400, label = "FAA Lifting"), color = "red", size = 3)+
+  scale_y_continuous(limits = c(300, 600))
+#The number of flights increased significantly after the FAA lifted the grounding. Likely due to holiday travel.
+```
+
+```{r}
+# QUESTION 2
+airport_data <- read.csv("airport_data.csv")
+state<-map_data("state")
+
+grounded_mapping <- grounded_dates %>% #CREATING NEW COLUMN THAT REPRESENTS DAYS BEFORE AND AFTER GROUNDING; WILL BE USED AS THE VARIABLE FOR FRAMES
+  left_join(airport_data, by = c("dest" = "faa")) #JOINING AIRPORT LOCATION DATA WITH OVERALL DATA
+  start_date <- as.Date("2019-02-27")
+  grounded_mapping$days_after_grounding <- as.integer(grounded_mapping$flight_date - start_date) - 14
+
+lifted_mapping <- lifted_dates %>% #CREATING NEW COLUMN THAT REPRESENTS DAYS BEFORE AND AFTER LIFTING; WILL BE USED AS THE VARIABLE FOR FRAMES
+  left_join(airport_data, by = c("dest" = "faa")) #JOINING AIRPORT LOCATION DATA WITH OVERALL DATA
+  end_date <- as.Date("2020-11-04")
+  lifted_mapping$days_after_lifting <- as.integer(lifted_mapping$flight_date - end_date) - 14
+
+#OVERALL FLIGHT DATA
+#GROUNDING
+overall_grounded_mapping <- grounded_mapping %>% #COUNTING FLIGHTS TO EACH AIRPORT BY DAY
+  group_by(days_after_grounding, dest, lat, lon) %>%
+  summarise(flight_count = n(), .groups = "drop")
+
+overall_grounding_flight_destinations<-ggplot() +
+  geom_polygon(data = state, aes(x = long, y = lat, group = group), fill = "lightgray", color = "white", size = 0.1) +
+  geom_point(data = overall_grounded_mapping, aes(x = lon, y = lat, size = flight_count, color = flight_count, frame = days_after_grounding),alpha = 0.5, na.rm = TRUE) +
+  scale_color_gradient(low = "blue", high = "red") +
+  scale_size_continuous(range = c(0.5, 7.5)) +
+  labs(title = "Overall Flights by Destination (Day 0 represents Grounding Order)",
+       subtitle = "Days After Grounding: {frame_time}") + 
+  theme_void() +
+  coord_fixed(1.3)
+ggplotly(overall_grounding_flight_destinations) %>% 
+  animation_opts(frame= 3000, easing = "linear", mode = "immediate")
+#Negligible visible difference. This is likely because 737 MAX planes represented a small portion of overall US planes and thus a small proportion of overall routes serviced.
+
+
+#LIFTING
+overall_lifting_mapping <- lifted_mapping %>%
+  group_by(days_after_lifting, dest, lat, lon) %>%
+  summarise(flight_count = n(), .groups = "drop")
+
+overall_lifting_flight_destinations<-ggplot() +
+  geom_polygon(data = state, aes(x = long, y = lat, group = group), fill = "lightgray", color = "white", size = 0.1) +
+  geom_point(data = overall_lifting_mapping, aes(x = lon, y = lat, size = flight_count, color = flight_count, frame = days_after_lifting),alpha = 0.5, na.rm = TRUE) +
+  scale_color_gradient(low = "blue", high = "red") +
+  scale_size_continuous(range = c(0.5, 7.5)) +
+  labs(title = "Overall Flights by Destination (Day 0 represents Lifting Order)",
+       subtitle = "Days After Lifting: {frame_time}") + 
+  theme_void() +
+  coord_fixed(1.3)
+ggplotly(overall_lifting_flight_destinations) %>% 
+  animation_opts(frame= 3000, easing = "linear", mode = "immediate")
+#Noticeable increase in service to individual locations such as Denver, Amarillo, Boise, Phoenix, and others. Noticable overall trend indicating slight increase in service volume across most airports. Most likely the result of increases in holiday travel, but may be attributed to more planes being availble.
+
+#SOUTHWEST
+#GROUNDING
+wn_grounded_mapping <- grounded_mapping %>%
+  filter(carrier == "WN") %>%
+  group_by(days_after_grounding, dest, lat, lon) %>%
+  summarise(flight_count = n(), .groups = "drop")
+
+wn_grounding_flight_destinations<-ggplot() +
+  geom_polygon(data = state, aes(x = long, y = lat, group = group), fill = "lightgray", color = "white", size = 0.1) +
+  geom_point(data = wn_grounded_mapping, aes(x = lon, y = lat, size = flight_count, color = flight_count, frame = days_after_grounding),alpha = 0.5, na.rm = TRUE) +
+  scale_color_gradient(low = "blue", high = "red") +
+  scale_size_continuous(range = c(0.5, 7.5)) +
+  labs(title = "Southwest Flights by Destination (Day 0 represents Grounding Order)",
+       subtitle = "Days After Grounding: {frame_time}") + 
+  theme_void() +
+  coord_fixed(1.3)
+ggplotly(wn_grounding_flight_destinations) %>% 
+  animation_opts(frame= 3000, easing = "linear", mode = "immediate")
+#Negligible visible difference. While Southwest utilized the most 737 MAX planes out of any US carrier, they only had 34 in the fleet out of over 800 planes. It makes sense for Southwest to be able to make up gaps in service using the rest of the fleet.
+
+#LIFTING
+wn_lifting_mapping <- lifted_mapping %>%
+  filter(carrier == "WN") %>%
+  group_by(days_after_lifting, dest, lat, lon) %>%
+  summarise(flight_count = n(), .groups = "drop")
+
+overall_lifting_mapping %>% 
+  group_by(dest) %>% 
+  summarise("count" = n())
+
+wn_lifting_flight_destinations<-ggplot() +
+  geom_polygon(data = state, aes(x = long, y = lat, group = group), fill = "lightgray", color = "white", size = 0.1) +
+  geom_point(data = wn_lifting_mapping , aes(x = lon, y = lat, size = flight_count, color = flight_count, frame = days_after_lifting),alpha = 0.5, na.rm = TRUE) +
+  scale_color_gradient(low = "blue", high = "red") +
+  scale_size_continuous(range = c(0.5, 7.5)) +
+  labs(title = "Southwest Flights by Destination (Day 0 represents Lifting Order)",
+       subtitle = "Days After Lifting: {frame_time}") + 
+  theme_void() +
+  coord_fixed(1.3)
+ggplotly(wn_lifting_flight_destinations) %>% 
+  animation_opts(frame= 3000, easing = "linear", mode = "immediate")
+#Noticeable increase in service to individual locations such as Houston, Chicago O'Hare, and others. Noticeable overall trend indicating slight increase in service volume across most airports. May be the result of holiday travel.
+
+#UNITED
+#GROUNDING
+ua_grounded_mapping <- grounded_mapping %>%
+  filter(carrier == "UA") %>%
+  group_by(days_after_grounding, dest, lat, lon) %>%
+  summarise(flight_count = n(), .groups = "drop")
+
+ua_grounding_flight_destinations<-ggplot() +
+  geom_polygon(data = state, aes(x = long, y = lat, group = group), fill = "lightgray", color = "white", size = 0.1) +
+  geom_point(data = ua_grounded_mapping, aes(x = lon, y = lat, size = flight_count, color = flight_count, frame = days_after_grounding),alpha = 0.5, na.rm = TRUE) +
+  scale_color_gradient(low = "blue", high = "red") +
+  scale_size_continuous(range = c(0.5, 7.5)) +
+  labs(title = "United Flights by Destination (Day 0 represents Grounding Order)",
+       subtitle = "Days After Grounding: {frame_time}") + 
+  theme_void() +
+  coord_fixed(1.3)
+ggplotly(ua_grounding_flight_destinations) %>% 
+  animation_opts(frame= 3000, easing = "linear", mode = "immediate")
+#Some service areas actually increase in flight arrivals such as Nashville while most of the routes remain unchanged. United only operated 14 737 MAX planes, so service is likely not to be disrupted heavily.
+
+#LIFTING
+ua_lifting_mapping <- lifted_mapping %>%
+  filter(carrier == "UA") %>% 
+  group_by(days_after_lifting, dest, lat, lon) %>%
+  summarise(flight_count = n(), .groups = "drop")
+
+ua_lifting_flight_destinations<-ggplot() +
+  geom_polygon(data = state, aes(x = long, y = lat, group = group), fill = "lightgray", color = "white", size = 0.1) +
+  geom_point(data = ua_lifting_mapping, aes(x = lon, y = lat, size = flight_count, color = flight_count, frame = days_after_lifting),alpha = 0.5, na.rm = TRUE) +
+  scale_color_gradient(low = "blue", high = "red") +
+  scale_size_continuous(range = c(0.5, 7.5)) +
+  labs(title = "United Flights by Destination (Day 0 represents Lifting Order)",
+       subtitle = "Days After Lifting: {frame_time}") + 
+  theme_void() +
+  coord_fixed(1.3)
+ggplotly(ua_lifting_flight_destinations) %>% 
+  animation_opts(frame= 3000, easing = "linear", mode = "immediate")
+#Little change before and after the lifting order. Denver, Houston, and Newark experienced high flight volumes both before and after the lifting.
+
+#DELTA
+#GROUNDING
+dl_grounded_mapping <- grounded_mapping %>%
+  filter(carrier == "DL") %>%
+  group_by(days_after_grounding, dest, lat, lon) %>%
+  summarise(flight_count = n(), .groups = "drop")
+
+dl_grounding_flight_destinations<-ggplot() +
+  geom_polygon(data = state, aes(x = long, y = lat, group = group), fill = "lightgray", color = "white", size = 0.1) +
+  geom_point(data = dl_grounded_mapping, aes(x = lon, y = lat, size = flight_count, color = flight_count, frame = days_after_grounding),alpha = 0.5, na.rm = TRUE) +
+  scale_color_gradient(low = "blue", high = "red") +
+  scale_size_continuous(range = c(0.5, 7.5)) +
+  labs(title = "Delta Flights by Destination (Day 0 represents Grounding Order)",
+       subtitle = "Days After Grounding: {frame_time}") + 
+  theme_void() +
+  coord_fixed(1.3)
+ggplotly(dl_grounding_flight_destinations) %>% 
+  animation_opts(frame= 3000, easing = "linear", mode = "immediate")
+#Negligible visible difference. No usage of 737-MAX in the fleet.
+
+#LIFTING
+dl_lifting_mapping <- lifted_mapping %>%
+  filter(carrier == "DL") %>%
+  group_by(days_after_lifting, dest, lat, lon) %>%
+  summarise(flight_count = n(), .groups = "drop")
+
+dl_lifting_flight_destinations<-ggplot() +
+  geom_polygon(data = state, aes(x = long, y = lat, group = group), fill = "lightgray", color = "white", size = 0.1) +
+  geom_point(data = dl_lifting_mapping, aes(x = lon, y = lat, size = flight_count, color = flight_count, frame = days_after_lifting),alpha = 0.5, na.rm = TRUE) +
+  scale_color_gradient(low = "blue", high = "red") +
+  scale_size_continuous(range = c(0.5, 7.5)) +
+  labs(title = "Delta Flights by Destination (Day 0 represents Lifting Order)",
+       subtitle = "Days After Lifting: {frame_time}") + 
+  theme_void() +
+  coord_fixed(1.3)
+ggplotly(dl_lifting_flight_destinations) %>% 
+  animation_opts(frame= 3000, easing = "linear", mode = "immediate")
+#Little change before and after the lifting order. Airports all down on the East Coast and the major airports all over the Eastern United States maintained a steady level of flight activity throughout the period.
+```
+
+```{r}
+# QUESTION 3
+grounded_dates$days_after_grounding <- as.integer(grounded_dates$flight_date - start_date) - 14 
+    
+grounded_cancellations <- grounded_dates %>% 
+  mutate(canceled = ifelse(is.na(arr_time), 1, 0)) %>% 
+  group_by(days_after_grounding) %>%
+  summarise(total_flights = n(),canceled_flights = sum(canceled), cancel_rate = mean(canceled, na.rm = TRUE))
+
+lifted_dates$days_after_lifting <- as.integer(lifted_dates$flight_date - end_date) - 14
+    
+lifted_cancellations <- lifted_dates %>% 
+  mutate(canceled = ifelse(is.na(arr_time), 1, 0)) %>% 
+  group_by(days_after_lifting) %>%
+  summarise(total_flights = n(),canceled_flights = sum(canceled), cancel_rate = mean(canceled, na.rm = TRUE))
+
+#OVERALL AVERAGE DELAYS AND CANCELLATIONS
+#GROUNDING
+overall_grounding_delays<-ggplot(grounded_dates, aes(x=dep_delay, y=arr_delay, frame=days_after_grounding, colour = carrier))+ 
+  geom_point(alpha=0.25)+
+  labs(title = "Overall Delays by Day (Day 0 represents Grounding Order)", x = "Departure Delays", y = "Arrival Delays", color = "Carrier")
+ggplotly(overall_grounding_delays) %>% 
+  animation_opts(frame= 1500, redraw = FALSE)
+#Spike in delays from day 0 to day 3 after the grounding order; United and Southwest flights seem to be overrepresented. This may imply shocks to their flight networks that can be explained by a loss of some fleet operation. The delays appear to normalize after several days, indicating that these shocks may not be sustained throughout the entire duration of the grounding.
+
+ggplot(grounded_cancellations, aes(x= days_after_grounding, y = cancel_rate, fill = days_after_grounding)) +
+  geom_bar(stat = "identity", show.legend = FALSE) +
+  labs(title = "Overall Proportion of Canceled Flights by Day (Day 0 represents Grounding Order)", x = "Day", y = "Proportion of Canceled Flights") +
+  scale_y_continuous(expand = c(0, 0.005)) +
+  theme_minimal()
+#Large spike in canceled flights the day of and after the grounding order. This may imply that the grounding caused some issues with flight and plane availability.
+
+#LIFTING
+overall_lifting_delays<-ggplot(lifted_dates, aes(x=dep_delay, y=arr_delay, frame=days_after_lifting))+ 
+  geom_point(aes(colour = carrier, alpha=0.25))+
+  labs(title = "Overall Delays by Day (Day 0 represents Lifting Order)", x = "Departure Delays", y = "Arrival Delays")
+ggplotly(overall_lifting_delays) %>% 
+  animation_opts(frame= 1500, redraw = FALSE)
+#Little change in overall delays after the lifting. Some spike in delays occur several days after the lifting order, but this may be the result of increased air travel traffic owing to the Thanksgiving holiday.
+
+ggplot(lifted_cancellations, aes(x= days_after_lifting, y = cancel_rate, fill = days_after_lifting)) +
+  geom_bar(stat = "identity", show.legend = FALSE) +
+  labs(title = "Overall Proportion of Canceled Flights by Day (Day 0 represents Lifting Order)", x = "Day", y = "Proportion of Canceled Flights") +
+  scale_y_continuous(expand = c(0, 0.005)) +
+  theme_minimal()
+#Increase in cancellations after lifting order, but may be attributed to the increase in holiday traffic. We would expect overall cancellations to decrease in this case.
+
+#SOUTHWEST FLIGHT DATA
+#GROUNDING
+cancelled_wn_flights_grounded <- grounded_dates %>%
+  filter(carrier == "WN") %>%
+  mutate(canceled = ifelse(is.na(arr_time), 1, 0)) %>% 
+  group_by(days_after_grounding) %>%
+  summarise(total_flights = n(),canceled_flights = sum(canceled), cancel_rate = mean(canceled, na.rm = TRUE))
+ggplot(cancelled_wn_flights_grounded, aes(x= days_after_grounding, y = cancel_rate, fill = days_after_grounding)) +
+  geom_bar(stat = "identity", show.legend = FALSE) +
+  labs(title = "Proportion of Canceled Southwest Flights by Day (Day 0 represents Grounding Order)", x = "Day", y = "Proportion of Canceled Flights") +
+  scale_y_continuous(expand = c(0, 0.005)) +
+  theme_minimal()
+#Looks to be slightly heightened cancellations after the grounding over that was sustained over the two weeks. This may signify that the loss of 30+ planes disrupted Southwest's overall operational efficiency for a short period after the grounding. With the loss of some planes, it is likely that the reduced fleet would face shortcomings and may have less room for flexibility, leading to expanded delays.
+
+#LIFTING
+cancelled_wn_flights_lifted <- lifted_dates %>% 
+  filter(carrier == "WN") %>%
+  mutate(canceled = ifelse(is.na(arr_time), 1, 0)) %>% 
+  group_by(days_after_lifting) %>%
+  summarise(total_flights = n(),canceled_flights = sum(canceled), cancel_rate = mean(canceled, na.rm = TRUE))
+ggplot(cancelled_wn_flights_lifted, aes(x= days_after_lifting, y = cancel_rate, fill = days_after_lifting)) +
+  geom_bar(stat = "identity", show.legend = FALSE) +
+  labs(title = "Proportion of Canceled Southwest Flights by Day (Day 0 represents Lifting Order)", x = "Day", y = "Proportion of Canceled Flights") +
+  scale_y_continuous(expand = c(0, 0.005)) +
+  theme_minimal()
+#Little change after lifting order. Small decrease could be attributed to an increase in overall flight network flexiblity, but hard to determine from the graph alone.
+
+#UNITED FLIGHT DATA
+#GROUNDING
+cancelled_ua_flights_grounded <- grounded_dates %>%
+  filter(carrier == "UA") %>%
+  mutate(canceled = ifelse(is.na(arr_time), 1, 0)) %>% 
+  group_by(days_after_grounding) %>%
+  summarise(total_flights = n(),canceled_flights = sum(canceled), cancel_rate = mean(canceled, na.rm = TRUE))
+ggplot(cancelled_ua_flights_grounded, aes(x= days_after_grounding, y = cancel_rate, fill = days_after_grounding)) +
+  geom_bar(stat = "identity", show.legend = FALSE) +
+  labs(title = "Proportion of Canceled United Flights by Day (Day 0 represents Grounding Order)", x = "Day", y = "Proportion of Canceled Flights") +
+  scale_y_continuous(expand = c(0, 0.005)) +
+  theme_minimal()
+#Peak in cancellations the day of the grounding orde but normalization shortly after. Implies some shocks to United's flight network, but was able to adapt relatively quickly to the loss of several planes.
+
+#LIFTING
+cancelled_ua_flights_lifted <- lifted_dates %>% 
+  filter(carrier == "UA") %>%
+  mutate(canceled = ifelse(is.na(arr_time), 1, 0)) %>% 
+  group_by(days_after_lifting) %>%
+  summarise(total_flights = n(),canceled_flights = sum(canceled), cancel_rate = mean(canceled, na.rm = TRUE))
+ggplot(cancelled_ua_flights_lifted, aes(x= days_after_lifting, y = cancel_rate, fill = days_after_lifting)) +
+  geom_bar(stat = "identity", show.legend = FALSE) +
+  labs(title = "Proportion of Canceled United Flights by Day (Day 0 represents Lifting Order)", x = "Day", y = "Proportion of Canceled Flights") +
+  theme_minimal()
+#Slight reduction after lifting order; the addition of several planes to United's fleet may increase flexibility and reduce stress.
+
+#DELTA FLIGHT DATA
+#GROUNDING
+cancelled_dl_flights_grounded <- grounded_dates %>%
+  filter(carrier == "DL") %>%
+  mutate(canceled = ifelse(is.na(arr_time), 1, 0)) %>% 
+  group_by(days_after_grounding) %>%
+  summarise(total_flights = n(),canceled_flights = sum(canceled), cancel_rate = mean(canceled, na.rm = TRUE))
+ggplot(cancelled_dl_flights_grounded, aes(x= days_after_grounding, y = cancel_rate, fill = days_after_grounding)) +
+  geom_bar(stat = "identity", show.legend = FALSE) +
+  labs(title = "Proportion of Canceled Delta Flights by Day (Day 0 represents Grounding Order)", x = "Day", y = "Proportion of Canceled Flights") +
+  theme_minimal()
+#Large peak in cancellations the day of the grounding order despite no 737 MAX planes being part of the Delta fleet. This may imply that disruption to flight services and confusion regarding the grounding order extended to the broader airline sphere.
+
+#LIFTING
+cancelled_dl_flights_lifted <- lifted_dates %>% 
+  filter(carrier == "dl") %>%
+  mutate(canceled = ifelse(is.na(arr_time), 1, 0)) %>% 
+  group_by(days_after_lifting) %>%
+  summarise(total_flights = n(),canceled_flights = sum(canceled), cancel_rate = mean(canceled, na.rm = TRUE))
+ggplot(cancelled_ua_flights_lifted, aes(x= days_after_lifting, y = cancel_rate, fill = days_after_lifting)) +
+  geom_bar(stat = "identity", show.legend = FALSE) +
+  labs(title = "Proportion of Canceled Delta Flights by Day (Day 0 represents Lifting Order)", x = "Day", y = "Proportion of Canceled Flights") +
+  theme_minimal()
+#Little change after lifting order. Expected due to lack of 737 MAX planes.
+```
+
+## 5. Implications and Conclusions
+Did the findings align with your initial expectations? What key insights have been gleaned from this research? What broader implications do these findings have for the airline industry, travelers, or policymakers?
+
+These findings did not align with our initial expectations. We anticipated observing larger trends in disruptions to overall U.S. domestic air travel. However, the effect of the grounding appeared to be largely limited to the immediate day of the event, as evidenced by a slight uptick in cancellations. Other observations, such as reductions in routes to regional destinations and differences in delay reliability, were not as pronounced as expected. Additionally, the lifting of the grounding order coincided with the 2020 Thanksgiving holiday and occurred during the COVID-19 pandemic, a period of significant disruption for the airline industry. This context likely limited the applicability of our findings. For broader policymaker and consumer implications, the results suggest that the U.S. airline industry is relatively well-insulated from external shocks. The large and well-developed American airline market appears able to absorb disruptions, with major impacts on passenger experience and availability only occurring in the case of larger events like COVID-19. While time constraints prevented further analysis, future research could focus on detailed metrics such as route frequency, plane utilization (e.g., how often a plane was forced to fly, potentially impacting service life), and other trends to gain deeper insights.
